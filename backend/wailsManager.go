@@ -2,14 +2,9 @@ package manager
 
 import (
 	"context"
-
-	//"io"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"optio/backend/config"
 	"optio/backend/stat"
-
-	//"github.com/dsoprea/go-exif/v3"
-	//exifcommon "github.com/dsoprea/go-exif/v3/common"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 type NotificationType int

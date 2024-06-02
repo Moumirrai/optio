@@ -1,64 +1,66 @@
 <template>
   <v-row class="fill-height pa-0 ma-0">
     <v-col class="d-flex flex-column justify-space-between ma-0 pa-0">
-      <v-container class="pt-5 px-5 pb-0">
+      <v-container class="pt-4 px-5 pb-6">
         <v-card-title class="text-h6 pa-0">Target</v-card-title>
+
+        <v-select
+          :items="codecs"
+          v-model="config.videoOpt.codec"
+          @update:model-value="store.setConfig()"
+          density="compact"
+          label="Codec"
+          class="mt-2"
+          :disabled="isProcessing"
+          variant="solo-inverted"
+          flat
+        >
+        </v-select>
+        <v-switch
+          color="primary"
+          density="compact"
+          inset
+          label="Percentage bitrate mode"
+          flat
+          @update:model-value="store.setConfig()"
+          v-model="config.videoOpt.percentageMode"
+        ></v-switch>
         <v-slider
-          v-model="slider"
+          v-if="config.videoOpt.percentageMode"
+          v-model="config.videoOpt.percentage"
           @end="store.setConfig()"
-          max="16"
+          max="100"
           min="1"
           density="compact"
-          class="mb-0 mt-2"
-          color="primary"
-          :disabled="config.target == target.WEBP && config.webpOpt.lossless"
+          class="mb-0"
           thumb-label
-          step="0.1"
+          step="1"
+          hide-details
         >
           <template v-slot:prepend> Bitrate </template>
-          <!-- <template v-slot:append> <v-text-field
-                variant="solo-filled"
-                density="compact"
-                v-model="slider"
-                hide-details
-                single-line
-                disabled=""
-                solo
-                class="mt-2"
-                style="width: 50px"
-                ></v-text-field>
-            <v-card
-              rounded="md"
-              color="#2a2a2a"
-              class="py-2 text-center"
-              width="50"
-            >
-              {{ slider + "%" }}
-            </v-card>
-          </template> -->
+          <template v-slot:thumb-label="{ modelValue }">
+            {{ modelValue }}%
+          </template>
         </v-slider>
-        <div v-if="config.target == target.WEBP">
-          <v-switch
-            color="primary"
-            density="compact"
-            inset
-            label="Lossless"
-            flat
-            @update:model-value="store.setConfig()"
-            v-model="config.webpOpt.lossless"
-          ></v-switch>
-        </div>
-        <div v-if="config.target == target.JPG">
-          <v-switch
-            color="primary"
-            density="compact"
-            inset
-            label="Preserve metadata"
-            flat
-            @update:model-value="store.setConfig()"
-            v-model="config.jpegOpt.preserveMetadata"
-          ></v-switch>
-        </div>
+        <v-row v-else>
+          <v-col cols="6">
+            <v-text-field
+              v-model="bitrate"
+              @input="store.setConfig()"
+              label="Bitrate"
+              type="number"
+              variant="solo"
+              density="compact"
+              hide-details
+              dense
+              outlined
+              :disabled="config.videoOpt.percentageMode || isProcessing"
+            ></v-text-field>
+          </v-col>
+          <v-col cols="6" class="text-center my-auto">
+            {{formatSize(config.videoOpt.bitrate * 1000)}}/s
+          </v-col>
+        </v-row>
       </v-container>
       <v-divider></v-divider>
       <v-container class="pt-5 px-5 pb-0">
@@ -122,10 +124,11 @@
 </template>
 
 <script setup lang="ts">
-import { target } from "@/store/types";
+import {editorMode, target, codec} from "@/store/types";
 import { useMainStore, useVideoStore } from "@/store";
 import { storeToRefs } from "pinia";
 import { computed, ref, onBeforeMount } from "vue";
+import {formatSize} from "@/utils/format";
 
 const store = useMainStore();
 const videoStore = useVideoStore();
@@ -135,31 +138,22 @@ onBeforeMount(async () => {
   await store.getConfig();
 });
 
-const items = Object.values(target);
+const codecs = Object.values(codec);
 
-const slider = computed({
+function setPercentageMode(value: boolean) {
+  config.value.videoOpt.percentageMode = value;
+  store.setConfig();
+}
+
+const bitrate = computed({
   get: () => {
-    switch (config.value.target) {
-      case target.JPG:
-        return config.value.jpegOpt.quality;
-      case target.PNG:
-        return config.value.pngOpt.quality;
-      case target.WEBP:
-        return config.value.webpOpt.quality;
-    }
+    return config.value.videoOpt.bitrate.toString();
   },
-  set: (value) => {
-    if (!store.configLoaded) return;
-    switch (config.value.target) {
-      case target.JPG:
-        config.value.jpegOpt.quality = Math.floor(value);
-        break;
-      case target.PNG:
-        config.value.pngOpt.quality = Math.floor(value);
-        break;
-      case target.WEBP:
-        config.value.webpOpt.quality = Math.floor(value);
-        break;
+  set: (value: string) => {
+    const intValue = parseInt(value, 10);
+    if (!isNaN(intValue) && intValue > 0) {
+      config.value.videoOpt.bitrate = intValue;
+      store.setConfig();
     }
   },
 });

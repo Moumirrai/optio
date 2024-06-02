@@ -11,20 +11,22 @@ import (
 )
 
 type VideoFileInfo struct {
-	Name          string    `json:"name"`
-	ID            string    `json:"id"`
-	Size          int64     `json:"size"`
-	DateCreated   time.Time `json:"dateCreated"`
-	Path          string    `json:"path"`
-	ConvertedPath string    `json:"convertedPath"`
-	Converted     bool      `json:"converted"`
-	Error         string    `json:"error"`
-	ConvertedSize int64     `json:"convertedSize"`
-	Width         int       `json:"width"`
-	Height        int       `json:"height"`
-	Duration      float64   `json:"duration"`
-	Bitrate       int       `json:"bitrate"`
-	Framerate     string    `json:"framerate"`
+	Name           string     `json:"name"`
+	ID             string     `json:"id"`
+	Size           int64      `json:"size"`
+	DateCreated    time.Time  `json:"dateCreated"`
+	Path           string     `json:"path"`
+	ConvertedPath  string     `json:"convertedPath"`
+	Converted      bool       `json:"converted"`
+	Error          string     `json:"error"`
+	ConvertedSize  int64      `json:"convertedSize"`
+	Width          int        `json:"width"`
+	Height         int        `json:"height"`
+	Duration       float64    `json:"duration"`
+	Bitrate        int        `json:"bitrate"`
+	Framerate      string     `json:"framerate"`
+	StartTimestamp *time.Time `json:"startTimestamp"`
+	Progress       float64    `json:"progress"`
 }
 
 func GetFileInfo(path string, ctx context.Context) (VideoFileInfo, error) {

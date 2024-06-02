@@ -19,6 +19,10 @@ export const useVideoStore = defineStore("video", {
     files: [],
     totalSize: 0,
     loading: false,
+    current: {
+      file: null,
+      eta: 0,
+    },
   }),
   getters: {
     //getConfig: (state): Config => state.config,

@@ -13,7 +13,7 @@
         rounded="lg"
         color="background"
       >
-        <v-card-title>Pepe</v-card-title>
+        <v-card-title>Video</v-card-title>
         <v-card-actions>
           <v-btn
             color="primary"
@@ -32,6 +32,9 @@
             Clear
           </v-btn>
         </v-card-actions>
+        <v-card-subtitle v-if="videoStore.current.eta > 0">
+          ETA: {{formatTime(videoStore.current.eta)}}
+        </v-card-subtitle>
       </v-card>
     </v-toolbar>
     <v-container
@@ -51,7 +54,7 @@ import { useMainStore, useVideoStore } from "@/store";
 import FileListVideo from "./FileListVideo.vue";
 import { ref } from "vue";
 
-import { formatSize } from "@/utils/format";
+import {formatDate, formatSize, formatTime} from "@/utils/format";
 import { storeToRefs } from "pinia";
 
 const store = useMainStore();
@@ -59,28 +62,8 @@ const videoStore = useVideoStore();
 
 const { ongoingProcess } = storeToRefs(store);
 
-function test(e: Event) {
-  console.log(e);
-}
-
-const lastScrollTop = ref(0);
 const smallToolbar = ref(false);
 
-/* const handleScroll = (e: Event) => {
-  const target = e.target as HTMLElement;
-  const scrollTop = target.scrollTop;
-
-  if (Math.abs(scrollTop - lastScrollTop.value) > 100) {
-    if (scrollTop > lastScrollTop.value) {
-      smallToolbar.value = true;
-    } else {
-      smallToolbar.value = false;
-    }
-    lastScrollTop.value = scrollTop <= 0 ? 0 : scrollTop; // For Mobile or negative scrolling
-  }
-}; */
-
-//
 </script>
 
 <style scoped lang="scss">

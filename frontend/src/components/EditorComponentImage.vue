@@ -1,69 +1,3 @@
-<!--<template>
-<v-container class="editorContainer">
-    <v-responsive class="fill-height">
-      <v-card outlined class="pb-1 fixed-card">
-        &lt;!&ndash; <v-progress-linear
-          :indeterminate="true"
-          location="bottom center"
-          color="amber"
-          height="25"
-        ></v-progress-linear> &ndash;&gt;
-
-        <v-row>
-          <v-col cols="6">
-            <v-card-text>
-              <div class="text-subtitle-1">
-                Selected: {{ imageStore.files.length }}
-              </div>
-              <div class="text-subtitle-1">
-                Total Size:
-                {{
-                  imageStore.totalSize
-                    ? formatSize(imageStore.totalSize)
-                    : "0 KB"
-                }}
-              </div>
-            </v-card-text>
-            <v-card-actions>
-              <v-btn
-                color="primary"
-                @click="imageStore.addFiles()"
-                :disabled="isProcessing"
-              >
-                <v-icon left>mdi-plus</v-icon>
-                Add Images
-              </v-btn>
-              <v-btn
-                color="error"
-                @click="imageStore.clear()"
-                :disabled="isProcessing"
-              >
-                <v-icon left>mdi-delete</v-icon>
-                Clear
-              </v-btn>
-            </v-card-actions>
-          </v-col>
-          <v-col cols="6">
-            &lt;!&ndash; Reserved for statistics after conversion &ndash;&gt;
-          </v-col>
-        </v-row>
-        <v-expand-transition>
-          <v-progress-linear
-            v-if="progress > 0"
-            color="primary"
-            height="10"
-            v-model="progress"
-            absolute
-            location="bottom"
-          ></v-progress-linear>
-        </v-expand-transition>
-      </v-card>
-      <v-card class="mt-5 scrollable-list">
-        <file-list-image></file-list-image>
-      </v-card>
-    </v-responsive>
-  </v-container>
-</template>-->
 <template>
   <v-container :fluid="true" class="fill-height flex-container">
     <v-toolbar
@@ -98,6 +32,24 @@
             Clear
           </v-btn>
         </v-card-actions>
+        <v-card-subtitle class="d-flex justify-space-between">
+          <div>
+            {{`Saved: ${formatSize(store.saveings)}`}}
+          </div>
+          <div v-if="progress != 0">
+            {{`ETA: ${imageStore.progress.eta.minutes} minutes ${imageStore.progress.eta.seconds} seconds`}}
+          </div>
+        </v-card-subtitle>
+        <v-expand-transition>
+          <v-progress-linear
+            v-if="progress > 0"
+            color="primary"
+            height="10"
+            v-model="progress"
+            absolute
+            location="bottom"
+          ></v-progress-linear>
+        </v-expand-transition>
       </v-card>
     </v-toolbar>
     <v-container

@@ -11,9 +11,11 @@ export type Config = {
     suffix: string;
     sizes: Size[];
     activeSize?: string;
-    jpegOpt: JPEGOpt;
-    pngOpt: PNGOpt;
-    webpOpt: WebPOpt;
+    imageOpt: {
+      jpegOpt: JPEGOpt;
+      pngOpt: PNGOpt;
+      webpOpt: WebPOpt;
+    };
     videoOpt: VideoOpt;
     preserveCreationTime: boolean;
 };
@@ -24,11 +26,23 @@ export enum resizeStrategy {
     Smart = 2,
 }
 
+export enum codec {
+    H264 = "h264_nvenc",
+    H265 = "hevc_nvenc",
+    VP9 = "vp9",
+    AV1 = "av1",
+    X264 = "libx264",
+    X265 = "libx265",
+    VP8 = "libvpx",
+}
+
 export type VideoOpt = {
     bitrate: number;
     height: number;
     width: number;
-    codec: string;
+    codec: codec;
+    percentageMode: boolean;
+    percentage: number;
 };
 
 export type Size = {
@@ -60,6 +74,7 @@ export type State = {
     ongoingProcess: boolean;
     ongoingCancelation: boolean;
     progress: number;
+    saveings: number;
     mode: editorMode;
 };
 

@@ -3,32 +3,24 @@ package imageManager
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	"image"
 	"math"
-	"sync"
-
-	//"io"
 	manager "optio/backend"
 	"optio/backend/config"
-	"optio/backend/jpeg"
+	"optio/backend/image/jpeg"
+	"optio/backend/image/png"
+	"optio/backend/image/webp"
 	"optio/backend/metadata"
-	"optio/backend/png"
 	"optio/backend/stat"
-	"optio/backend/webp"
 	"os"
 	"path"
-	"strings"
-
-	"time"
-
 	"path/filepath"
 	goruntime "runtime"
-
-	//"github.com/dsoprea/go-exif/v3"
-	//exifcommon "github.com/dsoprea/go-exif/v3/common"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"strings"
+	"sync"
+	"time"
 )
 
 type ImageFileInfo struct {
@@ -88,21 +80,28 @@ func (im *ImageManager) Debug() bool {
 	return false
 }
 
-func (im *ImageManager) AddFiles() (string, error) {
+func (im *ImageManager) AddFiles() (*SessionData, error) {
+	lastDir := im.config.App.LastDir
+	if _, err := os.Stat(lastDir); os.IsNotExist(err) {
+		lastDir, err = os.UserHomeDir()
+		if err != nil {
+			runtime.LogError(im.ctx, "Error getting user home dir")
+		}
+	}
 	files, err := runtime.OpenMultipleFilesDialog(im.ctx, runtime.OpenDialogOptions{
 		Title:            "Pepe",
-		DefaultDirectory: im.config.App.LastDir,
+		DefaultDirectory: lastDir,
 		Filters: []runtime.FileFilter{
 			{DisplayName: "Images", Pattern: "*.jpg;*.jpeg;*.png;*.webp"},
 		},
 	})
 	runtime.EventsEmit(im.ctx, "image:addingFiles")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if len(files) == 0 {
-		return "", nil
+		return nil, nil
 	}
 
 	//get path of the first file without the filename, so i guess, split by \ and then join all but the last one
@@ -111,38 +110,33 @@ func (im *ImageManager) AddFiles() (string, error) {
 	addedFilesCount := 0 // Initialize the counter
 
 	for _, file := range files {
-		// Check if file already exists in the map
 		if _, exists := im.Session.FilesLookup[file]; !exists {
 			fileInfo, err := os.Stat(file)
 			if err != nil {
 				continue
 			}
-			im.Session.TotalSize += uint64(fileInfo.Size())
-			im.Session.Files = append(im.Session.Files, ImageFileInfo{
-				Name:          fileInfo.Name(),
-				ID:            fmt.Sprintf("%d%d%s", fileInfo.ModTime().Unix(), fileInfo.Size(), fileInfo.Name()),
-				Size:          fileInfo.Size(),
-				MimeType:      getFileType(filepath.Ext(file)),
-				DateCreated:   metadata.GetCTime(fileInfo),
-				Path:          file,
-				ConvertedPath: "",
-				Converted:     false,
-				ConvertedSize: 0,
-			})
-			im.Session.FilesLookup[file] = true
-			addedFilesCount++ // Increment the counter
+			im.addFileToSession(file, fileInfo)
+			addedFilesCount++
 		}
 	}
 
-	jsonString, err := json.Marshal(im.Session)
-	if err != nil {
-		return "", err
-	}
+	return &im.Session, nil
+}
 
-	//send "added x files" notification
-	im.manager.Notify(fmt.Sprintf("Added %d files", addedFilesCount), manager.Success)
-
-	return string(jsonString), nil
+func (im *ImageManager) addFileToSession(file string, fileInfo os.FileInfo) {
+	im.Session.TotalSize += uint64(fileInfo.Size())
+	im.Session.Files = append(im.Session.Files, ImageFileInfo{
+		Name:          fileInfo.Name(),
+		ID:            fmt.Sprintf("%d%d%s", fileInfo.ModTime().Unix(), fileInfo.Size(), fileInfo.Name()),
+		Size:          fileInfo.Size(),
+		MimeType:      getFileType(filepath.Ext(file)),
+		DateCreated:   metadata.GetCTime(fileInfo),
+		Path:          file,
+		ConvertedPath: "",
+		Converted:     false,
+		ConvertedSize: 0,
+	})
+	im.Session.FilesLookup[file] = true
 }
 
 // Clear removes the files in the Manager.
@@ -151,9 +145,11 @@ func (im *ImageManager) Clear() {
 		return
 	}
 	im.manager.Notify("Cleared files", manager.Info)
-	im.Session.Files = make([]ImageFileInfo, 0)
-	im.Session.FilesLookup = make(map[string]bool)
-	im.Session.TotalSize = 0
+	im.Session = SessionData{
+		Files:       make([]ImageFileInfo, 0),
+		FilesLookup: make(map[string]bool),
+		TotalSize:   0,
+	}
 }
 
 func (im *ImageManager) worker(fileInfo ImageFileInfo, done chan<- time.Duration) {
@@ -197,6 +193,12 @@ func (im *ImageManager) worker(fileInfo ImageFileInfo, done chan<- time.Duration
 		return
 	}
 
+	if img == nil {
+		im.manager.Notify(fmt.Sprintf("Decoded image is nil: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+
 	filenameWithoutExt := strings.TrimSuffix(fileInfo.Name, filepath.Ext(fileInfo.Name))
 	dest := path.Join(im.config.App.OutDir, im.config.App.Prefix+filenameWithoutExt+im.config.App.Suffix+"."+im.config.App.Target)
 
@@ -228,11 +230,11 @@ func (im *ImageManager) worker(fileInfo ImageFileInfo, done chan<- time.Duration
 
 	switch im.config.App.Target {
 	case "jpg":
-		err = jpeg.EncodeJPEG(img, writer, im.config.App.JpegOpt)
+		err = jpeg.EncodeJPEG(img, writer, im.config.App.ImageOpt.JpegOpt)
 	case "png":
-		err = png.EncodePNG(img, writer, im.config.App.PngOpt)
+		err = png.EncodePNG(img, writer, im.config.App.ImageOpt.PngOpt)
 	case "webp":
-		err = webp.EncodeWebp(img, writer, im.config.App.WebpOpt)
+		err = webp.EncodeWebp(img, writer, im.config.App.ImageOpt.WebpOpt)
 	}
 	if err != nil {
 		im.manager.Notify(fmt.Sprintf("Failed to encode file: %s", fileInfo.Name), manager.Error)
@@ -283,6 +285,134 @@ func (im *ImageManager) worker(fileInfo ImageFileInfo, done chan<- time.Duration
 	done <- time.Since(start)
 }
 
+func decodeImage(filePath string, reader *bufio.Reader) (image.Image, error) {
+	var img image.Image
+	var err error
+	switch filepath.Ext(filePath) {
+	case ".jpg", ".jpeg":
+		img, err = jpeg.DecodeJPEG(reader)
+	case ".png":
+		img, err = png.DecodePNG(reader)
+	case ".webp":
+		img, err = webp.DecodeWebp(reader)
+	default:
+		err = fmt.Errorf("unsupported file type: %s", filePath)
+	}
+	return img, err
+}
+
+func (im *ImageManager) encodeImage(writer *bufio.Writer, img image.Image) error {
+	var err error
+	switch im.config.App.Target {
+	case "jpg":
+		err = jpeg.EncodeJPEG(img, writer, im.config.App.ImageOpt.JpegOpt)
+	case "png":
+		err = png.EncodePNG(img, writer, im.config.App.ImageOpt.PngOpt)
+	case "webp":
+		err = webp.EncodeWebp(img, writer, im.config.App.ImageOpt.WebpOpt)
+	}
+	return err
+}
+
+/*func (im *ImageManager) worker(fileInfo ImageFileInfo, wg *sync.WaitGroup, done chan<- time.Duration) {
+	defer wg.Done()
+	start := time.Now()
+
+	if _, err := os.Stat(fileInfo.Path); os.IsNotExist(err) {
+		im.manager.Notify(fmt.Sprintf("Source file does not exist: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+
+	file, err := os.Open(fileInfo.Path)
+	if err != nil {
+		im.manager.Notify(fmt.Sprintf("Failed to open file: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+	defer file.Close()
+
+	// Create a buffered reader from the file
+	reader := bufio.NewReader(file)
+	img, err := decodeImage(fileInfo.Path, reader)
+
+	if err != nil {
+		im.manager.Notify(fmt.Sprintf("Failed to decode file: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+
+	if img == nil {
+		im.manager.Notify(fmt.Sprintf("Decoded image is nil: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+
+	filenameWithoutExt := strings.TrimSuffix(fileInfo.Name, filepath.Ext(fileInfo.Name))
+	dest := path.Join(im.config.App.OutDir, im.config.App.Prefix+filenameWithoutExt+im.config.App.Suffix+"."+im.config.App.Target)
+
+	if _, err := os.Stat(dest); err == nil {
+		im.manager.Notify(fmt.Sprintf("File already exists: %s", dest), manager.Error)
+		done <- 0
+		return
+	}
+
+	destFile, err := os.Create(dest)
+
+	if err != nil {
+		im.manager.Notify(fmt.Sprintf("Failed to create file: %s", dest), manager.Error)
+		runtime.LogError(im.ctx, err.Error())
+		done <- 0
+		return
+	}
+
+	defer destFile.Close()
+
+	writer := bufio.NewWriter(destFile)
+	if err = im.encodeImage(writer, img); err != nil {
+		im.manager.Notify(fmt.Sprintf("Failed to encode file: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+
+	if err = writer.Flush(); err != nil {
+		im.manager.Notify(fmt.Sprintf("Failed to flush file: %s", fileInfo.Name), manager.Error)
+		done <- 0
+		return
+	}
+
+	if im.config.App.PreserveCreationTime {
+		if err := metadata.SetCTime(destFile, fileInfo.DateCreated); err != nil {
+			im.manager.Notify(fmt.Sprintf("Failed to change file's date of creation: %s", dest), manager.Error)
+			runtime.LogError(im.ctx, err.Error())
+			done <- 0
+			return
+		}
+	}
+
+	stats, err := destFile.Stat()
+	if err != nil {
+		im.manager.Notify(fmt.Sprintf("Failed to get file's stats: %s", dest), manager.Error)
+		runtime.LogError(im.ctx, err.Error())
+		done <- 0
+		return
+	}
+
+	fileInfo.ConvertedPath = filepath.Clean(dest)
+	fileInfo.Converted = true
+	fileInfo.ConvertedSize = stats.Size()
+
+	runtime.EventsEmit(im.ctx, "conversion:image:progress", map[string]interface{}{
+		"id":      fileInfo.ID,
+		"newSize": fileInfo.ConvertedSize,
+		"ratio":   math.Round((1 - float64(fileInfo.ConvertedSize)/float64(fileInfo.Size)) * 100),
+		"time":    time.Since(start).Milliseconds(),
+	})
+
+	// Send the conversion time to the channel
+	done <- time.Since(start)
+}*/
+
 func (im *ImageManager) StopConversion() {
 	im.stopRequested = true
 	im.manager.Notify("Stopping conversion...", manager.Info)
@@ -320,6 +450,7 @@ func (im *ImageManager) StartConversion() {
 		sem <- struct{}{} // Acquire a token
 		wg.Add(1)
 		go func(fileInfo ImageFileInfo) {
+			/*im.worker(fileInfo, &wg, done)*/
 			im.worker(fileInfo, done)
 			<-sem // Release the token
 			wg.Done()

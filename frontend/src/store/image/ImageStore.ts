@@ -15,25 +15,39 @@ export const useImageStore = defineStore("image", {
       savings: 0,
       time: 0,
     },
+    hash: "",
     files: [],
     totalSize: 0,
     loading: false,
+    progress: {
+      percentage: 0,
+      processed: 0,
+      left: 0,
+      eta: {
+        seconds: 0,
+        minutes: 0
+      }
+    }
   }),
   actions: {
     async addFiles(): Promise<void> {
       const rawData = await imageManager.AddFiles();
-      this.loading = false;
-      if (rawData === "") {
+      if (rawData === null) {
         return;
       }
-      const data = JSON.parse(rawData) as ImageSessionFiles;
-      this.files = Object.values(data.imageFiles);
-      this.totalSize = data.totalImageSize;
+      //const data = await JSON.parse(rawData) as ImageSessionFiles;
+
+      //this.files = Object.values(rawData.imageFiles);
+      this.files = rawData.imageFiles;
+      this.totalSize = rawData.totalImageSize;
+      this.hash = Math.random().toString(36).substring(7);
+      this.loading = false;
     },
     async clear(): Promise<void> {
       await imageManager.Clear();
       this.files = [];
       this.totalSize = 0;
+      this.hash = Math.random().toString(36).substring(7);
     },
     async test(): Promise<void> {
       const pepe = await imageManager.Debug();
@@ -46,6 +60,8 @@ export const useImageStore = defineStore("image", {
       }
       imageManager.StartConversion();
       mainStore.ongoingProcess = true;
+      this.startTime = Date.now()
+      this.resetProgress();
       console.log("Processing");
     },
     stopProcess(): void {
@@ -57,5 +73,17 @@ export const useImageStore = defineStore("image", {
       mainStore.ongoingCancelation = true;
       console.log("Stopped");
     },
+    resetProgress(): void {
+      this.progress = {
+        percentage: 0,
+        processed: 0,
+        left: 0,
+        eta: {
+          seconds: 0,
+          minutes: 0
+        }
+      }
+    }
   },
 });
+

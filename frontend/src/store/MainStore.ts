@@ -1,6 +1,6 @@
 // Utilities
 import { defineStore } from "pinia";
-import { Config, editorMode, Size, State, target } from "./types";
+import {codec, Config, editorMode, Size, State, target} from "./types";
 import {
   GetAppConfig,
   OpenOutputDir,
@@ -21,26 +21,31 @@ export const useMainStore = defineStore("main", {
       prefix: "",
       suffix: "",
       sizes: [],
-      jpegOpt: {
-        quality: 0,
-        preserveMetadata: false,
-      },
-      pngOpt: {
-        quality: 0,
-      },
-      webpOpt: {
-        quality: 0,
-        lossless: false,
+      imageOpt: {
+        jpegOpt: {
+          quality: 0,
+          preserveMetadata: false,
+        },
+        pngOpt: {
+          quality: 0,
+        },
+        webpOpt: {
+          quality: 0,
+          lossless: false,
+        },
       },
       videoOpt: {
-        bitrate: 0,
+        bitrate: 50000,
         height: 0,
         width: 0,
-        codec: "",
+        codec: codec.X264,
+        percentageMode: true,
+        percentage: 50,
       },
       activeSize: undefined,
       preserveCreationTime: false,
     },
+    saveings: 0,
     sizeModal: false,
     configModal: false,
     configLoaded: false,

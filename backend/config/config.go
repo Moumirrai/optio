@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"optio/backend/jpeg"
+	"optio/backend/image/jpeg"
+	"optio/backend/image/png"
+	"optio/backend/image/webp"
 	"optio/backend/localstore"
-	"optio/backend/png"
-	video "optio/backend/videoEnc"
-	"optio/backend/webp"
+	"optio/backend/models"
 	"os"
 	"os/exec"
 	"path"
@@ -20,24 +20,20 @@ import (
 
 const filename = "conf.json"
 
-// App represents application persistent configuration values.
 type App struct {
-	OutDir               string         `json:"outDir"`
-	Target               string         `json:"target"`
-	Prefix               string         `json:"prefix"`
-	Suffix               string         `json:"suffix"`
-	Sizes                []*size        `json:"sizes"`
-	ActiveSize           string         `json:"activeSize"`
-	JpegOpt              *jpeg.Options  `json:"jpegOpt"`
-	PngOpt               *png.Options   `json:"pngOpt"`
-	WebpOpt              *webp.Options  `json:"webpOpt"`
-	VideoOpt             *video.Options `json:"videoOpt"`
-	LastDir              string         `json:"lastDir"`
-	PreserveCreationTime bool           `json:"preserveCreationTime"`
-	Advanced             *advanced      `json:"advanced"`
+	OutDir               string               `json:"outDir"`
+	Target               string               `json:"target"`
+	Prefix               string               `json:"prefix"`
+	Suffix               string               `json:"suffix"`
+	Sizes                []*size              `json:"sizes"`
+	ActiveSize           string               `json:"activeSize"`
+	ImageOpt             *models.ImageOptions `json:"imageOpt"`
+	VideoOpt             *models.VideoOptions `json:"videoOpt"`
+	LastDir              string               `json:"lastDir"`
+	PreserveCreationTime bool                 `json:"preserveCreationTime"`
+	Advanced             *advanced            `json:"advanced"`
 }
 
-// Config represents the application settings.
 type Config struct {
 	App        *App
 	ctx        context.Context
@@ -63,7 +59,6 @@ func (c *Config) Startup(ctx context.Context) {
 	c.ctx = ctx
 }
 
-// NewConfig returns a new instance of Config.
 func NewConfig() *Config {
 	c := &Config{}
 	c.localStore = localstore.NewLocalStore()
@@ -78,7 +73,6 @@ func NewConfig() *Config {
 	return c
 }
 
-// GetAppConfig returns the application configuration.
 func (c *Config) GetAppConfig() map[string]interface{} {
 	return map[string]interface{}{
 		"outDir":               c.App.OutDir,
@@ -87,21 +81,17 @@ func (c *Config) GetAppConfig() map[string]interface{} {
 		"suffix":               c.App.Suffix,
 		"sizes":                c.App.Sizes,
 		"activeSize":           c.App.ActiveSize,
-		"jpegOpt":              c.App.JpegOpt,
-		"pngOpt":               c.App.PngOpt,
-		"webpOpt":              c.App.WebpOpt,
+		"imageOpt":             c.App.ImageOpt,
 		"videoOpt":             c.App.VideoOpt,
 		"lastDir":              c.App.LastDir,
 		"preserveCreationTime": c.App.PreserveCreationTime,
 	}
 }
 
-// OpenOutputDir opens the output directory using the native system browser.
 func (c *Config) OpenOutputDir() {
 	runtime.BrowserOpenURL(c.ctx, c.App.OutDir)
 }
 
-// RestoreDefaults sets the app configuration to defaults.
 func (c *Config) RestoreDefaults() (err error) {
 	var a *App
 	a, err = defaults()
@@ -115,7 +105,6 @@ func (c *Config) RestoreDefaults() (err error) {
 	return nil
 }
 
-// SetConfig sets and stores the given configuration.
 func (c *Config) SetConfig(cfg string) error {
 	a := &App{}
 	if err := json.Unmarshal([]byte(cfg), &a); err != nil {
@@ -130,10 +119,7 @@ func (c *Config) SetConfig(cfg string) error {
 	return nil
 }
 
-// SetOutDir opens a directory select dialog and sets the output directory to
-// the chosen directory.
 func (c *Config) SetOutDir() string {
-	//dir := c.Runtime.Dialog.SelectDirectory()
 	dir, err := runtime.OpenDirectoryDialog(c.ctx, *&runtime.OpenDialogOptions{Title: "Select Output Directory"})
 	if err != nil {
 		runtime.LogErrorf(c.ctx, "failed to open directory dialog: %v", err)
@@ -160,13 +146,22 @@ func (c *Config) GetCpuCores() int {
 	return goruntime.NumCPU()
 }
 
-// defaults returns the application configuration defaults.
 func defaults() (*App, error) {
 	a := &App{
-		Target:               "webp",
-		JpegOpt:              &jpeg.Options{Quality: 80, PreserveMetadata: false},
-		PngOpt:               &png.Options{Quality: 80},
-		WebpOpt:              &webp.Options{Lossless: false, Quality: 80},
+		Target: "webp",
+		ImageOpt: &models.ImageOptions{
+			JpegOpt: &jpeg.Options{Quality: 80, PreserveMetadata: false},
+			PngOpt:  &png.Options{Quality: 80},
+			WebpOpt: &webp.Options{Lossless: false, Quality: 80},
+		},
+		VideoOpt: &models.VideoOptions{
+			Width:          1920,
+			Height:         1080,
+			Bitrate:        50000,
+			Codec:          "libx264",
+			PercentageMode: true,
+			Percentage:     50,
+		},
 		PreserveCreationTime: false,
 		Advanced: &advanced{
 			CoresUsed:    int(float64(goruntime.NumCPU()) * 0.8),
@@ -194,7 +189,6 @@ func defaults() (*App, error) {
 	return a, nil
 }
 
-// store stores the configuration state to the file system.
 func (c *Config) store() error {
 	js, err := json.Marshal(c.GetAppConfig())
 	if err != nil {
@@ -217,7 +211,7 @@ func CheckNVEncAvailable() bool {
 	return strings.Contains(string(output), "NVIDIA-SMI")
 }
 
-func CheckFFmpegAvailable() bool {
+/*func CheckFFmpegAvailable() bool {
 	cmd := exec.Command("ffmpeg")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -225,3 +219,4 @@ func CheckFFmpegAvailable() bool {
 	}
 	return strings.Contains(string(output), "ffmpeg")
 }
+*/

@@ -23,7 +23,7 @@
           density="compact"
           class="mb-0 mt-2"
           :disabled="
-            (config.target == target.WEBP && config.webpOpt.lossless) ||
+            (config.target == target.WEBP && config.imageOpt.webpOpt.lossless) ||
             isProcessing
           "
           thumb-label
@@ -59,7 +59,7 @@
             label="Lossless"
             flat
             @update:model-value="store.setConfig()"
-            v-model="config.webpOpt.lossless"
+            v-model="config.imageOpt.webpOpt.lossless"
             :disabled="isProcessing"
           ></v-switch>
         </div>
@@ -135,6 +135,7 @@
           class="mb-0"
           @click="imageStore.process()"
           v-if="!isProcessing"
+          :disabled="!imageStore.files.length"
         >
           Process
           {{ imageStore.files.length ? `${imageStore.files.length} files` : "" }}</v-btn
@@ -175,24 +176,24 @@ const slider = computed({
   get: () => {
     switch (config.value.target) {
       case target.JPG:
-        return config.value.jpegOpt.quality;
+        return config.value.imageOpt.jpegOpt.quality;
       case target.PNG:
-        return config.value.pngOpt.quality;
+        return config.value.imageOpt.pngOpt.quality;
       case target.WEBP:
-        return config.value.webpOpt.quality;
+        return config.value.imageOpt.webpOpt.quality;
     }
   },
   set: (value) => {
     if (!store.configLoaded) return;
     switch (config.value.target) {
       case target.JPG:
-        config.value.jpegOpt.quality = Math.floor(value);
+        config.value.imageOpt.jpegOpt.quality = Math.floor(value);
         break;
       case target.PNG:
-        config.value.pngOpt.quality = Math.floor(value);
+        config.value.imageOpt.pngOpt.quality = Math.floor(value);
         break;
       case target.WEBP:
-        config.value.webpOpt.quality = Math.floor(value);
+        config.value.imageOpt.webpOpt.quality = Math.floor(value);
         break;
     }
   },

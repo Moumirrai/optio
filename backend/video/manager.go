@@ -1,49 +1,20 @@
 package videoManager
 
 import (
-	//video "optio/backend/videoEnc"
-	"os"
-	"os/exec"
-	"path"
-	"strings"
-
-	//"bufio"
-	//"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"path/filepath"
-	"runtime/debug"
-
-	//"encoding/json"
-	//"fmt"
-	//"image"
-	//"sync"
-
-	//"io"
+	"github.com/moumirrai/goffmpeg/transcoder"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 	manager "optio/backend"
 	"optio/backend/config"
-
-	//"optio/backend/jpeg"
-	//"optio/backend/metadata"
-	//"optio/backend/png"
 	"optio/backend/stat"
-	//"optio/backend/video"
-	//"optio/backend/webp"
-	//"os"
-	//"path"
-	//"runtime/debug"
-	//"strings"
-
+	"os"
+	"path"
+	"path/filepath"
+	"runtime/debug"
+	"strings"
 	"time"
-
-	//"path/filepath"
-	//goruntime "runtime"
-
-	//"github.com/dsoprea/go-exif/v3"
-	//exifcommon "github.com/dsoprea/go-exif/v3/common"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"github.com/xfrr/goffmpeg/transcoder"
 )
 
 type SessionData struct {
@@ -90,9 +61,17 @@ func (vm *VideoManager) Startup(ctx context.Context) error {
 }
 
 func (vm *VideoManager) AddFiles() (string, error) {
+	lastDir := vm.config.App.LastDir
+	if _, err := os.Stat(lastDir); os.IsNotExist(err) {
+		lastDir, err = os.UserHomeDir()
+		if err != nil {
+			runtime.LogError(vm.ctx, "Error getting user home dir")
+		}
+	}
+	runtime.LogInfo(vm.ctx, lastDir)
 	files, err := runtime.OpenMultipleFilesDialog(vm.ctx, runtime.OpenDialogOptions{
 		Title:            "Pepe",
-		DefaultDirectory: vm.config.App.LastDir,
+		DefaultDirectory: lastDir,
 		Filters: []runtime.FileFilter{
 			{DisplayName: "Videos", Pattern: "*.mp4;*.mov;*.avi;*.mkv;*.wmv;*.flv;*.webm"},
 		},
@@ -157,32 +136,6 @@ func (vm *VideoManager) Debug(source string) (VideoFileInfo, error) {
 	return GetFileInfo(source, ctx)
 }
 
-// TODO: DELETE
-func CheckNVEncAvailable() bool {
-	cmd := exec.Command("nvidia-smi")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(output), "NVIDIA-SMI")
-}
-
-func CheckFFmpegAvailable() bool {
-	cmd := exec.Command("ffmpeg")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(output), "ffmpeg")
-}
-
-type Options struct {
-	Width   int    `json:"width"`
-	Height  int    `json:"height"`
-	Bitrate int    `json:"bitrate"`
-	Codec   string `json:"codec"`
-}
-
 func (vm *VideoManager) StartReencoding() {
 	vm.stopRequested = false
 
@@ -192,7 +145,11 @@ func (vm *VideoManager) StartReencoding() {
 			fmt.Println("Stop requested")
 			break
 		}
-		start := time.Now()
+
+		_config := vm.config.App.VideoOpt
+
+		now := time.Now()
+		file.StartTimestamp = &now
 
 		if _, err := os.Stat(file.Path); os.IsNotExist(err) {
 			vm.manager.Notify(fmt.Sprintf("Source file does not exist: %s", file.Name), manager.Error)
@@ -207,31 +164,38 @@ func (vm *VideoManager) StartReencoding() {
 			continue
 		}
 
-		err := vm.transcoder.Initialize(file.Path, dest) // Replace "output.mp4" with your desired output file path
+		err := vm.transcoder.Initialize(file.Path, dest)
 		if err != nil {
 			vm.manager.Notify("Error with encoder", manager.Error)
 			panic(err)
 		}
-		vm.transcoder.MediaFile().SetVideoCodec("h264_nvenc")
-		vm.transcoder.MediaFile().SetVideoBitRate(fmt.Sprintf("%dk", 2500))
+		vm.transcoder.MediaFile().SetVideoCodec(_config.Codec)
+		if _config.PercentageMode {
+			vm.transcoder.MediaFile().SetVideoBitRate(fmt.Sprintf("%dk", file.Bitrate*_config.Percentage/100000))
+		} else {
+			vm.transcoder.MediaFile().SetVideoBitRate(fmt.Sprintf("%dk", _config.Bitrate))
+		}
 
 		done := vm.transcoder.Run(true)
 		progress := vm.transcoder.Output()
 
-		// Handle progress in the main goroutine
 		for p := range progress {
+			file.Progress = p.Progress
+			//eta := vm.calculateEta(file)
+			sinceStartFloat := float64(time.Since(*file.StartTimestamp).Milliseconds())
 			runtime.EventsEmit(vm.ctx, "conversion:video:progress", map[string]interface{}{
 				"id":       file.ID,
 				"progress": p.Progress,
+				"time":     time.Since(*file.StartTimestamp).Milliseconds(),
+				"eta":      ((sinceStartFloat / p.Progress) * 100.0) - sinceStartFloat,
 			})
 		}
 
-		// Wait for the transcoder to finish
 		<-done
 
 		runtime.EventsEmit(vm.ctx, "conversion:video:file", map[string]interface{}{
 			"id":   file.ID,
-			"time": time.Since(start).Milliseconds(),
+			"time": time.Since(*file.StartTimestamp).Milliseconds(),
 		})
 	}
 

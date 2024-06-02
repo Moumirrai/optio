@@ -37,7 +37,7 @@ func main() {
 	err := wails.Run(&options.App{
 		Title:                    "Optio",
 		Width:                    1200,
-		Height:                   742,
+		Height:                   800,
 		MinHeight:                600,
 		MinWidth:                 1200,
 		EnableDefaultContextMenu: false,

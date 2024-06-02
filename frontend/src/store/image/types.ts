@@ -14,9 +14,22 @@ export type State = {
   stats: Stats;
   session: Session;
   files: ImageFile[];
+  hash: string;
   totalSize: number;
   loading: boolean;
+  progress: Progress;
+  startTime?: number;
 };
+
+export type Progress = {
+  percentage: number;
+  processed: number;
+  left: number;
+  eta: {
+    minutes: number;
+    seconds: number;
+  }
+}
 
 export type ImageFile = {
   name: string;

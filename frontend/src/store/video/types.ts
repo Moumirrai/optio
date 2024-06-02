@@ -16,6 +16,10 @@ export type State = {
   files: VideoFile[];
   totalSize: number;
   loading: boolean;
+  current: {
+    file: VideoFile | null;
+    eta: number;
+  }
 };
 
 export type VideoFile = {

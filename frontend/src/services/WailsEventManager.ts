@@ -50,7 +50,6 @@ class WailsEventManager {
 
   private completeListener() {
     let test = 0;
-    let perce = 0;
     let startTime: number | null = null;
     EventsOn("conversion:image:progress", (data: ConversionInfo) => {
       const file = this.imageStore.files.find((f) => f.id === data.id);
@@ -63,8 +62,16 @@ class WailsEventManager {
         file.ratio = data.ratio;
         const percentage = (file.size / this.imageStore.totalSize) * 100;
         this.mainStore.progress += percentage;
+        const saved = file.size - data.newSize;
+        //if saves is a number
+        if (!isNaN(saved)) {
+          console.log(saved);
+          this.mainStore.saveings += saved;
+        }
 
-        /* if (startTime) {
+        test += file.size;
+
+        if (startTime) {
           const elapsedTime = (Date.now() - startTime) / 1000;
           const speed = test / elapsedTime;
           // Calculate the remaining size in bytes
@@ -77,8 +84,11 @@ class WailsEventManager {
           const etaMinutes = Math.floor(eta / 60);
           const etaSeconds = Math.floor(eta % 60);
 
+          this.imageStore.progress.eta.minutes = etaMinutes;
+          this.imageStore.progress.eta.seconds = etaSeconds;
+
           console.log(`ETA: ${etaMinutes} minutes, ${etaSeconds} seconds`);
-        } */
+        }
       }
     });
 
@@ -91,13 +101,17 @@ class WailsEventManager {
       this.mainStore.ongoingCancelation = false;
       this.mainStore.progress = 0;
       test = 0;
-      perce = 0;
       startTime = null;
     });
 
     EventsOn("conversion:video:progress", (data: VideoConversionProgress) => {
       const file = this.videoStore.files.find((f) => f.id === data.id);
+      if (!file) return
       file!.progress = data.progress;
+      this.videoStore.current = {
+        eta: data.eta,
+        file,
+      }
       console.log(data);
     });
 
@@ -113,8 +127,11 @@ class WailsEventManager {
       this.mainStore.ongoingProcess = false;
       this.mainStore.ongoingCancelation = false;
       this.mainStore.progress = 0;
+      this.videoStore.current = {
+        eta: 0,
+        file: null,
+      }
       test = 0;
-      perce = 0;
       startTime = null;
       console.log("Video conversion complete");
     });
@@ -141,6 +158,7 @@ type ConversionInfo = {
 type VideoConversionProgress = {
   id: string;
   progress: number;
+  eta: number;
 };
 
 type VideoConversionInfo = {
