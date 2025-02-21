@@ -30,3 +30,7 @@ To build a redistributable, production mode package, use `wails build`.
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request with your improvements.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for more details.
